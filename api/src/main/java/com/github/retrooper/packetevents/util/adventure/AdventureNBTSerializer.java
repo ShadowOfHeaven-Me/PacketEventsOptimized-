@@ -53,6 +53,7 @@ import net.kyori.adventure.text.event.ClickEvent;
 import net.kyori.adventure.text.event.DataComponentValue;
 import net.kyori.adventure.text.event.HoverEvent;
 import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.ShadowColor;
 import net.kyori.adventure.text.format.Style;
 import net.kyori.adventure.text.format.TextColor;
 import net.kyori.adventure.text.format.TextDecoration;
@@ -67,6 +68,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -152,7 +154,7 @@ public class AdventureNBTSerializer implements ComponentSerializer<Component, Co
         String selector = reader.readUTF("selector", Function.identity());
         String keybind = reader.readUTF("keybind", Function.identity());
         String nbt = reader.readUTF("nbt", Function.identity());
-        Boolean nbtInterpret = reader.readBoolean("interpret", Function.identity());
+        boolean nbtInterpret = Optional.ofNullable(reader.readBoolean("interpret", Function.identity())).orElse(false);
         BlockNBTComponent.Pos nbtBlock = reader.readUTF("block", BlockNBTComponent.Pos::fromString);
         String nbtEntity = reader.readUTF("entity", Function.identity());
         Key nbtStorage = reader.readUTF("storage", Key::key);
@@ -325,9 +327,13 @@ public class AdventureNBTSerializer implements ComponentSerializer<Component, Co
 
         reader.useUTF("font", value -> style.font(Key.key(value)));
         reader.useUTF("color", value -> {
-            TextColor color = deserializeColor(value);
+            TextColor color = this.deserializeColor(value);
             if (color != null) style.color(color);
         });
+        if (BackwardCompatUtil.IS_4_18_0_OR_NEWER) {
+            reader.useNumber("shadow_color", num ->
+                    style.shadowColor(ShadowColor.shadowColor(num.intValue())));
+        }
 
         for (String decorationKey : TextDecoration.NAMES.keys()) {
             reader.useBoolean(decorationKey, value -> style.decoration(
@@ -401,7 +407,12 @@ public class AdventureNBTSerializer implements ComponentSerializer<Component, Co
         if (font != null) writer.writeUTF("font", font.asString());
 
         TextColor color = style.color();
-        if (color != null) writer.writeUTF("color", serializeColor(color));
+        if (color != null) writer.writeUTF("color", this.serializeColor(color));
+
+        if (BackwardCompatUtil.IS_4_18_0_OR_NEWER) {
+            ShadowColor shadowColor = style.shadowColor();
+            if (shadowColor != null) writer.writeInt("shadow_color", shadowColor.value());
+        }
 
         for (TextDecoration decoration : TextDecoration.NAMES.values()) {
             TextDecoration.State state = style.decoration(decoration);
