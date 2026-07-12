@@ -54,6 +54,8 @@ import java.util.Objects;
 
 public class VelocityPacketEventsBuilder {
     private static PacketEventsAPI<PluginContainer> INSTANCE;
+    private static Logger logger;
+    private static Path dataDirectory;
 
     public static void clearBuildCache() {
         INSTANCE = null;
@@ -80,6 +82,8 @@ public class VelocityPacketEventsBuilder {
 
     public static PacketEventsAPI<PluginContainer> buildNoCache(ProxyServer server, PluginContainer plugin, Logger logger, Path dataDirectory,
                                                                 PacketEventsSettings inSettings) {
+        VelocityPacketEventsBuilder.logger = logger;
+        VelocityPacketEventsBuilder.dataDirectory = dataDirectory;
         return new PacketEventsAPI<PluginContainer>() {
             private final PacketEventsSettings settings = inSettings;
             // TODO Implement platform version
@@ -145,9 +149,32 @@ public class VelocityPacketEventsBuilder {
                 @Override
                 public Object getRegistryCacheKey(User user, ClientVersion version) {
                     Player player = server.getPlayer(user.getUUID()).orElse(null);
-                    return player == null ? null : Objects.hash(this.getTargetServer(player), version);
+                    return player == null ? null : new RegistryCacheKey(this.getTargetServer(player), version);
                 }
             };
+
+            final class RegistryCacheKey {
+
+                private final Object server;
+                private final ClientVersion version;
+
+                RegistryCacheKey(Object server, ClientVersion version) {
+                    this.server = server;
+                    this.version = version;
+                }
+
+                @Override
+                public boolean equals(Object o) {
+                    if (o == null || getClass() != o.getClass()) return false;
+                    RegistryCacheKey that = (RegistryCacheKey) o;
+                    return Objects.equals(server, that.server) && version == that.version;
+                }
+
+                @Override
+                public int hashCode() {
+                    return Objects.hash(server, version);
+                }
+            }
 
             private final PlayerManagerAbstract playerManager = new PlayerManagerImpl();
 
